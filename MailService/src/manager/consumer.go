@@ -3,6 +3,7 @@ package manager
 import (
 	"fmt"
 	"github.com/assembla/cony"
+	"io/ioutil"
 	"log"
 	"net/http"
 )
@@ -55,7 +56,6 @@ func newConsumer(name string, routerKey string, CallbackURL string) {
 
 	consumer := cony.NewConsumer(
 		queue,
-		cony.AutoAck(),
 	)
 	g_client.Consume(consumer)
 
@@ -72,20 +72,40 @@ func newConsumer(name string, routerKey string, CallbackURL string) {
 			case err := <-g_client.Errors():
 				log.Println(fmt.Sprintf("Client error: %v", err))
 			case msg := <-consumer.Deliveries():
-				HandleConsumeEvent(CallbackURL, msg.Body)
+				go func() {
+					ok := HandleConsumeEvent(CallbackURL, msg.Body)
+					if ok {
+						msg.Ack(true)
+					} else {
+						msg.Nack(true, true)
+					}
+				}()
 			}
 		}
 	}()
 }
 
-func HandleConsumeEvent(CallbackURL string, msg []byte) {
+func HandleConsumeEvent(CallbackURL string, msg []byte) bool {
 	log.Println(">>>>>>>>EVENT consumer recv msg")
 	log.Println(fmt.Sprintf("msg:%v callback:%v",
 		string(msg), CallbackURL))
 	req, _ := http.NewRequest("GET", fmt.Sprintf("%v?data=%v", CallbackURL, string(msg)), nil)
 	client := &http.Client{}
-	_, err := client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Println(fmt.Sprintf("HandleConsumeEvent-client.Do fail.err:%v", err))
+		return false
 	}
+
+	defer resp.Body.Close()
+	s, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println(fmt.Sprintf("HandleConsumeEvent-ioutil.ReadAll fail.err:%v", err))
+		return false
+	}
+	log.Println("callback.resp:", string(s))
+	if string(s) != "ok" {
+		return false
+	}
+	return true
 }

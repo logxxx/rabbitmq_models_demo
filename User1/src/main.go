@@ -60,7 +60,7 @@ func main() {
 	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
 		log.Println(consumerName, "recv data:", query.Get("data"))
-		fmt.Fprintf(w, "data received by %v", consumerName)
+		fmt.Fprintf(w, "ok")
 	})
 
 	log.Println("listen and reserve", consumerURL, "...")
