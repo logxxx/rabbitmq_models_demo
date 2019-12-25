@@ -59,7 +59,7 @@ func NewPublisher(routerKey string) {
 	defaultExchange := cony.Exchange{
 		Name: defaultExchangeName,
 		Kind: defalutExchangeKind,
-		Args: amqp.Table{"alternate-exchange": "beyong_exchange"},
+		Args: amqp.Table{"alternate-exchange": "beiyong_exchange"},
 	}
 
 	g_client.Declare([]cony.Declaration{
@@ -71,15 +71,6 @@ func NewPublisher(routerKey string) {
 
 	pbl := cony.NewPublisher(defaultExchangeName, routerKey)
 	g_client.Publish(pbl)
-
-	go func() {
-		for {
-			select {
-			case err := <-g_client.Errors():
-				log.Println("publisher find Client err:", err)
-			}
-		}
-	}()
 
 	publishers[routerKey] = pbl
 }

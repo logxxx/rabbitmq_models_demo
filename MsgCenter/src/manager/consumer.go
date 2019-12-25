@@ -12,7 +12,7 @@ var (
 	isQueueUniq         = true
 	defaultExchangeName = "default_exchange"
 	defalutExchangeKind = "direct"
-	stop                = make(chan struct{})
+	stop                = make(chan string)
 )
 
 func InitConsumer() {
@@ -40,7 +40,7 @@ func InitConsumer() {
 
 		c, ok := consumers[name]
 		if ok {
-			stop <- struct{}{}
+			stop <- name
 			c.Cancel()
 			consumers[name] = nil
 		}
@@ -84,12 +84,14 @@ func newConsumer(name string, routerKey string, CallbackURL string) {
 
 	consumers[name] = consumer
 
-	go func() {
-		for {
+	go func(name string) {
+		for g_client.Loop() {
 			select {
-			case <-stop:
-				log.Println(fmt.Sprintf("One Consumer unregisted."))
-				return
+			case stopName := <-stop:
+				if stopName == name {
+					log.Println(fmt.Sprintf("Consumer[%v] unregisted.", stopName))
+					return
+				}
 			case err := <-consumer.Errors():
 				log.Println(fmt.Sprintf("Consumer error: %v", err))
 			case err := <-g_client.Errors():
@@ -109,7 +111,7 @@ func newConsumer(name string, routerKey string, CallbackURL string) {
 				}()
 			}
 		}
-	}()
+	}(name)
 }
 
 func HandleConsumeEvent(consumer *cony.Consumer, CallbackURL string, msg []byte) bool {
