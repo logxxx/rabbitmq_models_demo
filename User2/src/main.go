@@ -22,9 +22,9 @@ func main() {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(fmt.Sprintf("register_publisher fail.err:%v",err))
+		panic(fmt.Sprintf("register_publisher fail.err:%v", err))
 	}
-	s,err:=ioutil.ReadAll(resp.Body)
+	s, err := ioutil.ReadAll(resp.Body)
 	log.Println("register.resp:", string(s))
 
 	//2.等待输入消息并推送给mq
@@ -37,9 +37,9 @@ func main() {
 		req, _ := http.NewRequest("GET", mqURL+"/do_publish"+params, nil)
 		resp, err := client.Do(req)
 		if err != nil {
-			panic(fmt.Sprintf("do_publish fail.err:%v",err))
+			panic(fmt.Sprintf("do_publish fail.err:%v", err))
 		}
-		s,err:=ioutil.ReadAll(resp.Body)
+		s, err := ioutil.ReadAll(resp.Body)
 		log.Println(string(s))
 	}
 }

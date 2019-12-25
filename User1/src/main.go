@@ -10,13 +10,13 @@ import (
 )
 
 var (
-	msgCenterURL = "http://127.0.0.1:8006"
-	consumerURL  = "http://127.0.0.1:8002"
+	mailServiceURL = "http://127.0.0.1:8006"
+	consumerURL    = "http://127.0.0.1:8001"
 )
 
 func doRegistConsumer(consumerName string, routerKey string, callback string) {
 	params := fmt.Sprintf("?name=%v&routerkey=%v&callback=%v", consumerName, routerKey, callback)
-	finalUrl := msgCenterURL + "/regist_consumer" + params
+	finalUrl := mailServiceURL + "/regist_consumer" + params
 	log.Println("req:", finalUrl)
 	req, err := http.NewRequest("GET", finalUrl, nil)
 	if err != nil {
@@ -33,7 +33,7 @@ func doRegistConsumer(consumerName string, routerKey string, callback string) {
 
 func doUnRegistConsumer(consumerName string) {
 	params := fmt.Sprintf("?name=%v", consumerName)
-	finalUrl := msgCenterURL + "/unregist_consumer" + params
+	finalUrl := mailServiceURL + "/unregist_consumer" + params
 	log.Println("req:", finalUrl)
 	req, err := http.NewRequest("GET", finalUrl, nil)
 	if err != nil {
@@ -51,7 +51,7 @@ func doUnRegistConsumer(consumerName string) {
 func main() {
 	routerKey := "order"
 	callback := consumerURL + "/callback"
-	consumerName := "consumer2"
+	consumerName := "User1"
 
 	log.Println("=====1.注册成为消费者")
 	doRegistConsumer(consumerName, routerKey, callback)
@@ -64,7 +64,7 @@ func main() {
 	})
 
 	log.Println("listen and reserve", consumerURL, "...")
-	go http.ListenAndServe(":8002", nil)
+	go http.ListenAndServe(":8001", nil)
 
 	//捕获程序退出
 	c := make(chan os.Signal, 1)

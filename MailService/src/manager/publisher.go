@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	consumers  = make(map[string]*cony.Consumer, 0)
-	publishers = make(map[string]*cony.Publisher, 0)
+	g_consumers  = make(map[string]*cony.Consumer, 0)
+	g_publishers = make(map[string]*cony.Publisher, 0)
 )
 
 func InitPublisher() {
@@ -42,50 +42,14 @@ func InitPublisher() {
 }
 
 func NewPublisher(routerKey string) {
-	//备用交换器
-	beiyongQueue := &cony.Queue{
-		Name: "beiyong_queue",
-	}
-	beiyongExchange := cony.Exchange{
-		Name: "beiyong_exchange",
-		Kind: "fanout",
-	}
-	bind := cony.Binding{
-		Queue:    beiyongQueue,
-		Exchange: beiyongExchange,
-		Key:      routerKey,
-	}
-
-	defaultExchange := cony.Exchange{
-		Name: defaultExchangeName,
-		Kind: defalutExchangeKind,
-		Args: amqp.Table{"alternate-exchange": "beyong_exchange"},
-	}
-
-	g_client.Declare([]cony.Declaration{
-		cony.DeclareQueue(beiyongQueue),
-		cony.DeclareExchange(beiyongExchange),
-		cony.DeclareBinding(bind),
-		cony.DeclareExchange(defaultExchange),
-	})
-
 	pbl := cony.NewPublisher(defaultExchangeName, routerKey)
 	g_client.Publish(pbl)
 
-	go func() {
-		for {
-			select {
-			case err := <-g_client.Errors():
-				log.Println("publisher find Client err:", err)
-			}
-		}
-	}()
-
-	publishers[routerKey] = pbl
+	g_publishers[routerKey] = pbl
 }
 
 func DoPublish(routerKey string, data string) string {
-	publisher, ok := publishers[routerKey]
+	publisher, ok := g_publishers[routerKey]
 	if !ok {
 		return "error:not found"
 	}
