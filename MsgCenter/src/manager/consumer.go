@@ -8,6 +8,13 @@ import (
 	"net/http"
 )
 
+var (
+	isQueueUniq         = true
+	defaultExchangeName = "default_exchange"
+	defalutExchangeKind = "direct"
+	stop                = make(chan struct{})
+)
+
 func InitConsumer() {
 	//提供接口:注册成为消费者
 	//http://127.0.0.1:8006/regist_consumer?dest=xxx&callback=xxx
@@ -33,19 +40,15 @@ func InitConsumer() {
 
 		c, ok := consumers[name]
 		if ok {
+			stop <- struct{}{}
 			c.Cancel()
+			consumers[name] = nil
 		}
 
 		fmt.Fprintf(w, "UnRegist Succ.")
-		log.Println(fmt.Sprintf("event unregist_consumer: name=%v"))
+		log.Println(fmt.Sprintf("event unregist_consumer: name=%v", name))
 	})
 }
-
-var (
-	isQueueUniq         = true
-	defaultExchangeName = "default_exchange"
-	defalutExchangeKind = "fanout"
-)
 
 func newConsumer(name string, routerKey string, CallbackURL string) {
 	queue := &cony.Queue{}
@@ -84,7 +87,18 @@ func newConsumer(name string, routerKey string, CallbackURL string) {
 	go func() {
 		for {
 			select {
+			case <-stop:
+				log.Println(fmt.Sprintf("One Consumer unregisted."))
+				return
+			case err := <-consumer.Errors():
+				log.Println(fmt.Sprintf("Consumer error: %v", err))
+			case err := <-g_client.Errors():
+				log.Println(fmt.Sprintf("Client error: %v", err))
 			case msg := <-consumer.Deliveries():
+				log.Println(fmt.Sprintf("xxxxxxxxmsg:%#v"), msg)
+				if len(msg.Body) == 0 {
+					continue
+				}
 				go func() {
 					ok := HandleConsumeEvent(consumer, CallbackURL, msg.Body)
 					if !ok {
@@ -93,10 +107,6 @@ func newConsumer(name string, routerKey string, CallbackURL string) {
 						msg.Ack(false)
 					}
 				}()
-			case err := <-consumer.Errors():
-				log.Println(fmt.Sprintf("Consumer error: %v", err))
-			case err := <-g_client.Errors():
-				log.Println(fmt.Sprintf("Client error: %v", err))
 			}
 		}
 	}()

@@ -42,6 +42,33 @@ func InitPublisher() {
 }
 
 func NewPublisher(routerKey string) {
+	//备用交换器
+	beiyongQueue := &cony.Queue{
+		Name: "beiyong_queue",
+	}
+	beiyongExchange := cony.Exchange{
+		Name: "beiyong_exchange",
+		Kind: "fanout",
+	}
+	bind := cony.Binding{
+		Queue:    beiyongQueue,
+		Exchange: beiyongExchange,
+		Key:      routerKey,
+	}
+
+	defaultExchange := cony.Exchange{
+		Name: defaultExchangeName,
+		Kind: defalutExchangeKind,
+		Args: amqp.Table{"alternate-exchange": "beyong_exchange"},
+	}
+
+	g_client.Declare([]cony.Declaration{
+		cony.DeclareQueue(beiyongQueue),
+		cony.DeclareExchange(beiyongExchange),
+		cony.DeclareBinding(bind),
+		cony.DeclareExchange(defaultExchange),
+	})
+
 	pbl := cony.NewPublisher(defaultExchangeName, routerKey)
 	g_client.Publish(pbl)
 
