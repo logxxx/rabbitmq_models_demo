@@ -55,6 +55,7 @@ func newConsumer(name string, routerKey string, CallbackURL string) {
 
 	consumer := cony.NewConsumer(
 		queue,
+		cony.AutoAck(),
 	)
 	g_client.Consume(consumer)
 
