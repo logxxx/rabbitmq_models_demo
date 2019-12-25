@@ -11,21 +11,50 @@ import (
 func InitConsumer() {
 	//提供接口:注册成为消费者
 	//http://127.0.0.1:8006/regist_consumer?dest=xxx&callback=xxx
-	http.HandleFunc("/regist_consumer", func (w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/regist_consumer", func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
+		name := query.Get("name")
 		routerKey := query.Get("routerkey")
 		callbackURL := query.Get("callback")
 
-		newConsumer(routerKey, callbackURL)
+		newConsumer(name, routerKey, callbackURL)
 
-		fmt.Fprintf(w, "OK.RouterKey[%v] Callback[%v]",
-			routerKey, callbackURL)
-		log.Println(fmt.Sprintf("event regist_consumer:routerKey=%v callback=%v", routerKey, callbackURL))
+		fmt.Fprintf(w, "Regist Succ.Name[%v] RouterKey[%v] Callback[%v]",
+			name, routerKey, callbackURL)
+		log.Println(fmt.Sprintf("event regist_consumer: name=%v routerKey=%v callback=%v",
+			name, routerKey, callbackURL))
+	})
+
+	//提供接口:取消注册
+	//http://127.0.0.1:8006/unregist_consumer?name=xxx
+	http.HandleFunc("/unregist_consumer", func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		name := query.Get("name")
+
+		c, ok := consumers[name]
+		if ok {
+			c.Cancel()
+		}
+
+		fmt.Fprintf(w, "UnRegist Succ.")
+		log.Println(fmt.Sprintf("event unregist_consumer: name=%v"))
 	})
 }
 
-func newConsumer(routerKey string, CallbackURL string) {
-	queue := &cony.Queue{} //queuename如果不指定，则由mq系统用随机字符串命名
+var (
+	isQueueUniq         = true
+	defaultExchangeName = "default_exchange"
+	defalutExchangeKind = "fanout"
+)
+
+func newConsumer(name string, routerKey string, CallbackURL string) {
+	queue := &cony.Queue{}
+
+	queueName := "q_" + routerKey
+	if isQueueUniq {
+		queueName = "" //queuename如果不指定，则由mq系统用随机字符串命名
+	}
+	queue.Name = queueName
 
 	exchange := cony.Exchange{
 		Name: defaultExchangeName,
@@ -46,18 +75,23 @@ func newConsumer(routerKey string, CallbackURL string) {
 
 	consumer := cony.NewConsumer(
 		queue,
-		cony.AutoAck(),
+		cony.Tag(name),
 	)
 	g_client.Consume(consumer)
+
+	consumers[name] = consumer
 
 	go func() {
 		for {
 			select {
 			case msg := <-consumer.Deliveries():
-				log.Println(fmt.Sprintf("consumer_recv_msg:%v callback:%v",
-					string(msg.Body), CallbackURL))
 				go func() {
-					HandlerConsumeEvent(CallbackURL, msg.Body)
+					ok := HandleConsumeEvent(consumer, CallbackURL, msg.Body)
+					if !ok {
+						msg.Nack(false, true)
+					} else {
+						msg.Ack(false)
+					}
 				}()
 			case err := <-consumer.Errors():
 				log.Println(fmt.Sprintf("Consumer error: %v", err))
@@ -68,18 +102,24 @@ func newConsumer(routerKey string, CallbackURL string) {
 	}()
 }
 
-func HandlerConsumeEvent(CallbackURL string, msg []byte) {
+func HandleConsumeEvent(consumer *cony.Consumer, CallbackURL string, msg []byte) bool {
+	log.Println(">>>>>>>>EVENT consumer recv msg")
+	log.Println(fmt.Sprintf("msg:%v callback:%v",
+		string(msg), CallbackURL))
 	req, _ := http.NewRequest("GET", fmt.Sprintf("%v?data=%v", CallbackURL, string(msg)), nil)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(fmt.Sprintf("HandlerConsumeEvent-client.Do fail.err:%v",err))
+		log.Println(fmt.Sprintf("HandleConsumeEvent-client.Do fail.err:%v", err))
+		return false
 	}
-	defer resp.Body.Close()
-	s,err:=ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(fmt.Sprintf("HandlerConsumeEvent-ioutil.ReadAll fail.err:%v",err))
-	}
-	log.Println("HandlerConsumeEvent.resp:", string(s))
 
+	defer resp.Body.Close()
+	s, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println(fmt.Sprintf("HandleConsumeEvent-ioutil.ReadAll fail.err:%v", err))
+		return false
+	}
+	log.Println("callback.resp:", string(s))
+	return true
 }

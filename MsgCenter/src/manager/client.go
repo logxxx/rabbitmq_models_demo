@@ -6,10 +6,7 @@ import (
 )
 
 var (
-	g_client            *cony.Client
-	defaultExchangeName = "default_exchange"
-	defalutExchangeKind = "fanout"
-	g_counter = 0
+	g_client *cony.Client
 )
 
 func InitClient() {
