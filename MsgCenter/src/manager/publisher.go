@@ -41,7 +41,7 @@ func InitPublisher() {
 	})
 }
 
-func NewPublisher(routerKey string) {
+func declareExchange() {
 	//备用交换器
 	beiyongQueue := &cony.Queue{
 		Name: "beiyong_queue",
@@ -53,7 +53,7 @@ func NewPublisher(routerKey string) {
 	bind := cony.Binding{
 		Queue:    beiyongQueue,
 		Exchange: beiyongExchange,
-		Key:      routerKey,
+		Key:      "#",
 	}
 
 	defaultExchange := cony.Exchange{
@@ -69,9 +69,17 @@ func NewPublisher(routerKey string) {
 		cony.DeclareExchange(defaultExchange),
 	})
 
+}
+
+func NewPublisher(routerKey string) {
+
+	declareExchange()
+
+	//去mq注册发布者
 	pbl := cony.NewPublisher(defaultExchangeName, routerKey)
 	g_client.Publish(pbl)
 
+	//要把发布者对象缓存起来，因为发布消息时要调用.Publish()方法
 	publishers[routerKey] = pbl
 }
 

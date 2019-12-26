@@ -51,19 +51,18 @@ func InitConsumer() {
 }
 
 func newConsumer(name string, routerKey string, CallbackURL string) {
-	queue := &cony.Queue{}
-
-	queueName := "q_" + routerKey
-	if isQueueUniq {
-		queueName = "" //queuename如果不指定，则由mq系统用随机字符串命名
+	//声明一个队列
+	queue := &cony.Queue{
+		Name: "q_" + name,
 	}
-	queue.Name = queueName
 
+	//声明一个交换器
 	exchange := cony.Exchange{
 		Name: defaultExchangeName,
 		Kind: defalutExchangeKind,
 	}
 
+	//用routerKey绑定队列与交换器
 	bind := cony.Binding{
 		Queue:    queue,
 		Exchange: exchange,
@@ -76,6 +75,7 @@ func newConsumer(name string, routerKey string, CallbackURL string) {
 		cony.DeclareBinding(bind),
 	})
 
+	//注册消费者
 	consumer := cony.NewConsumer(
 		queue,
 		cony.Tag(name),
@@ -84,6 +84,7 @@ func newConsumer(name string, routerKey string, CallbackURL string) {
 
 	consumers[name] = consumer
 
+	//开始消费
 	go func(name string) {
 		for g_client.Loop() {
 			select {
